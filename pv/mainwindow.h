@@ -57,6 +57,7 @@ private:
 	pv::view::View *_view;
 
 	QAction *_action_open;
+	QAction *_action_save_as;
 	QAction *_action_view_zoom_in;
 	QAction *_action_view_zoom_out;
 	QAction *_action_view_show_cursors;
@@ -77,6 +78,8 @@ private:
 private slots:
 
 	void on_actionOpen_triggered();
+
+	void on_actionSaveAs_triggered();
 
 	void on_actionViewZoomIn_triggered();
 

@@ -36,7 +36,11 @@ public:
 
 	virtual ~DataSnapshot();
 
-	uint64_t get_sample_count();
+	void* get_data() const;
+
+	uint64_t get_sample_count() const;
+
+	int get_unit_size() const;
 
 protected:
 	void append_data(void *data, uint64_t samples);

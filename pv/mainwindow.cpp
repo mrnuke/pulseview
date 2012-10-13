@@ -98,12 +98,17 @@ void MainWindow::setup_ui()
 	_action_open->setIcon(QIcon::fromTheme("document-open"));
 	_action_open->setObjectName(QString::fromUtf8("actionOpen"));
 
+	_action_save_as = new QAction(this);
+	_action_save_as->setIcon(QIcon::fromTheme("document-save-as"));
+	_action_save_as->setObjectName(QString::fromUtf8("actionSaveAs"));
+
 	// Setup the menu bar
 	_menu_bar = new QMenuBar(this);
 	_menu_bar->setGeometry(QRect(0, 0, 400, 25));
 
 	_menu_file = new QMenu(_menu_bar);
 	_menu_file->addAction(_action_open);
+	_menu_file->addAction(_action_save_as);
 
 	_menu_view = new QMenu(_menu_bar);
 	_menu_view->addAction(_action_view_zoom_in);
@@ -142,6 +147,7 @@ void MainWindow::setup_ui()
 		QApplication::UnicodeUTF8));
 
 	_action_open->setText(QApplication::translate("MainWindow", "&Open...", 0, QApplication::UnicodeUTF8));
+	_action_save_as->setText(QApplication::translate("MainWindow", "&Save As...", 0, QApplication::UnicodeUTF8));
 	_action_view_zoom_in->setText(QApplication::translate("MainWindow", "Zoom &In", 0, QApplication::UnicodeUTF8));
 	_action_view_zoom_out->setText(QApplication::translate("MainWindow", "Zoom &Out", 0, QApplication::UnicodeUTF8));
 	_action_view_show_cursors->setText(QApplication::translate("MainWindow", "Show &Cursors", 0, QApplication::UnicodeUTF8));
@@ -163,6 +169,14 @@ void MainWindow::on_actionOpen_triggered()
 		this, tr("Open File"), "",
 		tr("Sigrok Sessions (*.sr)"));
 	_session.load_file(file_name.toStdString());
+}
+
+void MainWindow::on_actionSaveAs_triggered()
+{
+	QString file_name = QFileDialog::getSaveFileName(
+		this, tr("Save File"), "",
+		tr("Sigrok Sessions (*.sr)"));
+	_session.save_file(file_name.toStdString());
 }
 
 void MainWindow::on_actionViewZoomIn_triggered()

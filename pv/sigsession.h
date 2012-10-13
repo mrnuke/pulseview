@@ -47,6 +47,21 @@ class SigSession : public QObject
 {
 	Q_OBJECT
 
+private:
+	struct DevInstPriv {
+		SigSession *session;
+		uint64_t sample_rate;
+	};
+
+	struct SaveCallbackState {
+		SigSession *session;
+		uint64_t datasize;
+		uint8_t *data;
+	};
+
+private:
+	static int HwCaps[];
+
 public:
 	enum capture_state {
 		Stopped,
@@ -59,6 +74,8 @@ public:
 	~SigSession();
 
 	void load_file(const std::string &name);
+
+	void save_file(const std::string &name);
 
 	capture_state get_capture_state() const;
 
@@ -85,6 +102,15 @@ private:
 	static void data_feed_in_proc(const struct sr_dev_inst *sdi,
 		struct sr_datafeed_packet *packet);
 
+	static int info_get(int info_id, const void **data,
+		const struct sr_dev_inst *sdi);
+
+	struct sr_dev_inst* get_sr_dev_inst();
+
+	void release_sr_dev_inst(const struct sr_dev_inst *const sdi);
+
+	static ssize_t save_data_callback(uint16_t type,
+		void *data, size_t len, void *cb_data);
 private:
 	mutable boost::mutex _state_mutex;
 	capture_state _capture_state;

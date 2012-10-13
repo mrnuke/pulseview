@@ -33,6 +33,11 @@ using namespace std;
 
 namespace pv {
 
+int SigSession::HwCaps[] = {
+	SR_HWCAP_SAMPLERATE,
+	0
+};
+
 // TODO: This should not be necessary
 SigSession* SigSession::_session = NULL;
 
@@ -70,6 +75,41 @@ SigSession::capture_state SigSession::get_capture_state() const
 {
 	lock_guard<mutex> lock(_state_mutex);
 	return _capture_state;
+}
+
+void SigSession::save_file(const string &name)
+{
+	if(!_logic_data) {
+		qDebug() << "No _logic_data to save.";
+		return;
+	}
+
+	deque< shared_ptr<LogicDataSnapshot> > snapshots =
+		_logic_data->get_snapshots();
+	if(snapshots.empty()) {
+		qDebug() << "No snapshots to save.";
+		return;
+	}
+
+	const shared_ptr<LogicDataSnapshot> &snapshot = snapshots.front();
+	if(!snapshot) {
+		qDebug() << "snapshot is invalid.";
+		return;
+	}
+
+	const sr_dev_inst *const sdi = get_sr_dev_inst();
+
+	SaveCallbackState state = {
+		this,
+		snapshot->get_unit_size() * snapshot->get_sample_count(),
+		(uint8_t*)snapshot->get_data()
+	};
+
+	if (sr_session_save(name.c_str(), sdi, snapshot->get_unit_size(),
+		save_data_callback, &state) != SR_OK)
+		qDebug() << "Failed to store session.";
+
+	release_sr_dev_inst(sdi);
 }
 
 void SigSession::start_capture(struct sr_dev_inst *sdi,
@@ -249,6 +289,121 @@ void SigSession::data_feed_in_proc(const struct sr_dev_inst *sdi,
 {
 	assert(_session);
 	_session->data_feed_in(sdi, packet);
+}
+
+int SigSession::info_get(int info_id, const void **data,
+	const struct sr_dev_inst *sdi)
+{
+	// Respond to instance-less info requests
+	switch(info_id) {
+	case SR_DI_HWCAPS:
+		*data = HwCaps;
+		return SR_OK;
+	}
+
+	if(!sdi)
+		return SR_ERR_ARG;
+
+	// Respond to instanced info requests
+	DevInstPriv *const priv = (DevInstPriv*)sdi->priv;
+	assert(priv);
+
+	switch(info_id) {
+	case SR_DI_CUR_SAMPLERATE:
+		*(uint64_t**)data = &priv->sample_rate;
+		return SR_OK;
+	}
+
+	return SR_ERR_ARG;
+}
+
+struct sr_dev_inst* SigSession::get_sr_dev_inst()
+{
+	assert(_logic_data);
+
+	struct sr_dev_inst *sdi = new sr_dev_inst;
+	memset(sdi, 0, sizeof(sr_dev_inst));
+
+	sr_dev_driver *driver = new sr_dev_driver;
+	memset(driver, 0, sizeof(sr_dev_driver));
+	driver->info_get = info_get;
+
+	DevInstPriv *const priv = new DevInstPriv;
+	priv->session = this;
+	priv->sample_rate = _logic_data->get_samplerate();
+
+	for(int i = _signals.size() - 1; i >= 0; i--) {
+		const shared_ptr<view::Signal> s = _signals[i];
+		assert(s);
+
+		sr_probe *const probe = new struct sr_probe;
+
+		probe->index = i;
+		probe->type = SR_PROBE_LOGIC;
+		probe->enabled = TRUE;
+		probe->trigger = NULL;
+
+		const QString name = s->get_name();
+		probe->name = strdup(name.toUtf8().data());
+
+		sdi->probes = g_slist_prepend(sdi->probes, probe);
+	}
+
+	sdi->priv = priv;
+	sdi->driver = driver;
+
+	return sdi;
+}
+
+void SigSession::release_sr_dev_inst(const struct sr_dev_inst *const sdi)
+{
+	assert(sdi);
+	assert(sdi->driver);
+	assert(sdi->probes);
+
+	for(GSList *p = sdi->probes; p; p = p->next) {
+		sr_probe *const probe = (sr_probe*)p->data;
+
+		assert(probe->name);
+		free(probe->name);
+
+		delete probe;
+	}
+
+	g_slist_free(sdi->probes);
+
+	delete sdi->driver;
+	delete (DevInstPriv*)sdi->priv;
+	delete sdi;
+}
+
+ssize_t SigSession::save_data_callback(uint16_t type,
+	void *data, size_t len, void *cb_data)
+{
+	assert(cb_data);
+	SaveCallbackState *const state = (SaveCallbackState*)cb_data;
+
+	switch(type) {
+	case SR_DS_BEGIN:
+		return SR_OK;
+
+	case SR_DS_READ:
+	{
+		const ssize_t read_length = min(len, state->datasize);
+		memcpy(data, state->data, read_length);
+		state->datasize -= read_length;
+		state->data += len;
+		return read_length;
+	}
+
+	case SR_DS_END:
+		return SR_OK;
+
+	case SR_DS_ERROR:
+		return SR_OK;
+	};
+
+	return SR_ERR;
 }
 
 } // namespace pv

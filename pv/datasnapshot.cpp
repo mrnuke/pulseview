@@ -43,10 +43,20 @@ DataSnapshot::~DataSnapshot()
 	free(_data);
 }
 
-uint64_t DataSnapshot::get_sample_count()
+void* DataSnapshot::get_data() const
+{
+	return _data;
+}
+
+uint64_t DataSnapshot::get_sample_count() const
 {
 	lock_guard<recursive_mutex> lock(_mutex);
 	return _sample_count;
+}
+
+int DataSnapshot::get_unit_size() const
+{
+	return _unit_size;
 }
 
 void DataSnapshot::append_data(void *data, uint64_t samples)
