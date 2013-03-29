@@ -109,7 +109,7 @@ SamplingBar::SamplingBar(QWidget *parent) :
 
 	connect(&_sample_rate_list, SIGNAL(currentIndexChanged(int)),
 		this, SLOT(on_sample_rate_changed()));
-	connect(&_sample_rate_value, SIGNAL(editingFinished()),
+	connect(&_sample_rate_value, SIGNAL(valueChanged(const QString&)),
 		this, SLOT(on_sample_rate_changed()));
 }
 
@@ -252,7 +252,12 @@ void SamplingBar::update_sample_rate_selector_value()
 	}
 }
 
-void SamplingBar::commit_sample_rate()
+void SamplingBar::on_device_selected()
+{
+	update_sample_rate_selector();
+}
+
+void SamplingBar::on_sample_rate_changed()
 {
 	uint64_t sample_rate = 0;
 
@@ -280,20 +285,8 @@ void SamplingBar::commit_sample_rate()
 	}
 }
 
-void SamplingBar::on_device_selected()
-{
-	update_sample_rate_selector();
-}
-
-void SamplingBar::on_sample_rate_changed()
-{
-	commit_sample_rate();
-}
-
 void SamplingBar::configure()
 {
-	commit_sample_rate();
-
 	sr_dev_inst *const sdi = get_selected_device();
 	assert(sdi);
 

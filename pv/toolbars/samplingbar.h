@@ -62,7 +62,6 @@ signals:
 private:
 	void update_sample_rate_selector();
 	void update_sample_rate_selector_value();
-	void commit_sample_rate();
 
 private slots:
 	void on_device_selected();
