@@ -272,6 +272,8 @@ void SamplingBar::commit_sample_rate()
 				index).value<uint64_t>();
 	}
 
+	printf("Set sample_rate -> %lu\n", sample_rate);
+
 	// Set the samplerate
 	if (sr_config_set(sdi, SR_CONF_SAMPLERATE,
 		g_variant_new_uint64(sample_rate)) != SR_OK) {
