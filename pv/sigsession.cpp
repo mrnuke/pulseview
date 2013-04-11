@@ -104,7 +104,10 @@ void SigSession::stop_capture()
 	if (get_capture_state() == Stopped)
 		return;
 
-	sr_session_stop();
+	{
+		lock_guard<mutex> lock(_session_mutex);
+		sr_session_stop();
+	}
 
 	// Check that sampling stopped
 	if (_sampling_thread.get())
@@ -133,22 +136,29 @@ void SigSession::set_capture_state(capture_state state)
 void SigSession::load_thread_proc(const string name,
 	function<void (const QString)> error_handler)
 {
-	if (sr_session_load(name.c_str()) != SR_OK) {
-		error_handler(tr("Failed to load file."));
-		return;
-	}
+	{
+		lock_guard<mutex> lock(_session_mutex);
+		if (sr_session_load(name.c_str()) != SR_OK) {
+			error_handler(tr("Failed to load file."));
+			return;
+		}
 
-	sr_session_datafeed_callback_add(data_feed_in_proc);
+		sr_session_datafeed_callback_add(data_feed_in_proc);
 
-	if (sr_session_start() != SR_OK) {
-		error_handler(tr("Failed to start session."));
-		return;
+		if (sr_session_start() != SR_OK) {
+			error_handler(tr("Failed to start session."));
+			return;
+		}
 	}
 
 	set_capture_state(Running);
 
 	sr_session_run();
-	sr_session_stop();
+
+	{
+		lock_guard<mutex> lock(_session_mutex);
+		sr_session_destroy();
+	}
 
 	set_capture_state(Stopped);
 }
@@ -160,33 +170,40 @@ void SigSession::sample_thread_proc(struct sr_dev_inst *sdi,
 	assert(sdi);
 	assert(error_handler);
 
-	sr_session_new();
-	sr_session_datafeed_callback_add(data_feed_in_proc);
+	{
+		lock_guard<mutex> lock(_session_mutex);
+		sr_session_new();
+		sr_session_datafeed_callback_add(data_feed_in_proc);
 
-	if (sr_session_dev_add(sdi) != SR_OK) {
-		error_handler(tr("Failed to use device."));
-		sr_session_destroy();
-		return;
-	}
+		if (sr_session_dev_add(sdi) != SR_OK) {
+			error_handler(tr("Failed to use device."));
+			sr_session_destroy();
+			return;
+		}
 
-	// Set the sample limit
-	if (sr_config_set(sdi, SR_CONF_LIMIT_SAMPLES,
-		g_variant_new_uint64(record_length)) != SR_OK) {
-		error_handler(tr("Failed to configure "
-			"time-based sample limit."));
-		sr_session_destroy();
-		return;
-	}
+		// Set the sample limit
+		if (sr_config_set(sdi, SR_CONF_LIMIT_SAMPLES,
+			g_variant_new_uint64(record_length)) != SR_OK) {
+			error_handler(tr("Failed to configure "
+				"time-based sample limit."));
+			sr_session_destroy();
+			return;
+		}
 
-	if (sr_session_start() != SR_OK) {
-		error_handler(tr("Failed to start session."));
-		return;
+		if (sr_session_start() != SR_OK) {
+			error_handler(tr("Failed to start session."));
+			return;
+		}
 	}
 
 	set_capture_state(Running);
 
 	sr_session_run();
-	sr_session_destroy();
+
+	{
+		lock_guard<mutex> lock(_session_mutex);
+		sr_session_destroy();
+	}
 
 	set_capture_state(Stopped);
 }

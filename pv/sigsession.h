@@ -117,6 +117,12 @@ private:
 	boost::shared_ptr<data::Analog> _analog_data;
 	boost::shared_ptr<data::AnalogSnapshot> _cur_analog_snapshot;
 
+	/**
+	 * Mutex protects thread safety of libsigrok calls from
+	 * different threads.
+	 */
+	mutable boost::mutex _session_mutex;
+
 	std::auto_ptr<boost::thread> _sampling_thread;
 
 signals:
